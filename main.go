@@ -35,17 +35,17 @@ type Target struct {
 	Kind int
 }
 
-func cmdSel(ext string) (string, error) {
+func cmdSel(ext string, cmd Command) (string, error) {
 	var prog string
 	switch ext {
 	case ".txt":
-		prog = "notepad"
+		prog = cmd.Text
 	case ".md", ".markdown":
-		prog = "start"
+		prog = cmd.Markdown
 	case ".ppt", ".pptx":
-		prog = "powerpnt"
+		prog = cmd.PowerPoint
 	case ".xls", "xlsx", "xlsm":
-		prog = "xls"
+		prog = cmd.Excel
 	default:
 		return "", errors.New("this file extension is undefined")
 	}
@@ -59,7 +59,7 @@ func main() {
 		fmt.Println("ERROR: cannot get Home Directory path.", err)
 	}
 
-	configFilePath := homeDir + "/.fla_config.json"
+	configFilePath := homeDir + "/.fzl_config.json"
 
 	jsonData, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
@@ -72,9 +72,6 @@ func main() {
 		fmt.Println("ERROR: cannot json parse")
 		log.Fatal(err)
 	}
-
-	fmt.Println("powerpoint: ", cfg.Command.PowerPoint)
-	fmt.Println("excel: ", cfg.Command.Excel)
 
 	var items []Target
 
@@ -124,11 +121,11 @@ func main() {
 		if items[i].Kind == FILE {
 			ext = filepath.Ext(items[i].Path)
 			target = items[i].Path
-			prog, err = cmdSel(ext)
+			prog, err = cmdSel(ext, cfg.Command)
 		} else {
 			ext = ""
 			target = items[i].Path
-			prog = "cd"
+			prog = cfg.Command.Dir
 		}
 	}
 
