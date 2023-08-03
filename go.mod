@@ -1,4 +1,4 @@
-module help
+module fzl
 
 go 1.20
 
