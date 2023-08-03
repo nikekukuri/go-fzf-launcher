@@ -1,9 +1,10 @@
 package main
 
 import (
-	//"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -12,22 +13,27 @@ import (
 	"github.com/koki-develop/go-fzf"
 )
 
-/*
-func readPathList(fileName string) []string {
-	fp, err := os.Open(fileName)
-	if err != nil {
-		panic(err)
-	}
-	defer fp.Close()
+const (
+	FILE = iota
+	DIR
+)
 
-	scanner := bufio.NewScanner(fp)
-	var pathList []string
-	for scanner.Scan() {
-		pathList = append(pathList, scanner.Text())
-	}
-	return pathList
+type Config struct {
+	Command Command `json:"command"`
 }
-*/
+
+type Command struct {
+	PowerPoint string `json:"powerpoint"`
+	Excel      string `json:"excel"`
+	Text       string `json:"text"`
+	Markdown   string `json:"markdown"`
+	Dir        string `json:"dir"`
+}
+
+type Target struct {
+	Path string
+	Kind int
+}
 
 func cmdSel(ext string) (string, error) {
 	var prog string
@@ -48,19 +54,51 @@ func cmdSel(ext string) (string, error) {
 
 func main() {
 
-	//items := readPathList("test.txt")
-	var items []string
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println("ERROR: cannot get Home Directory path.", err)
+	}
+
+	configFilePath := homeDir + "/.fla_config.json"
+
+	jsonData, err := ioutil.ReadFile(configFilePath)
+	if err != nil {
+		fmt.Println("not existence `config.json` file, default values are applied.")
+	}
+
+	var cfg Config
+	err = json.Unmarshal(jsonData, &cfg)
+	if err != nil {
+		fmt.Println("ERROR: cannot json parse")
+		log.Fatal(err)
+	}
+
+	fmt.Println("powerpoint: ", cfg.Command.PowerPoint)
+	fmt.Println("excel: ", cfg.Command.Excel)
+
+	var items []Target
 
 	//TODO: support specific path
 	dirPath := "./"
 
-	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	err = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil { return err
+		}
+
+		if info.IsDir() && info.Name() == ".git" {
+			return filepath.SkipDir
 		}
 
 		if !info.IsDir() {
-			items = append(items, path)
+			items = append(items, Target{
+				Path: path,
+				Kind: FILE,
+			})
+		} else {
+			items = append(items, Target{
+				Path: path,
+				Kind: DIR,
+			})
 		}
 
 		return nil
@@ -70,36 +108,37 @@ func main() {
 		log.Fatal(err)
 	}
 
-	for _, p := range items {
-		fmt.Println(p)
-	}
-
 	f, err := fzf.New()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	idxs, err := f.Find(items, func(i int) string { return items[i] })
+	idxs, err := f.Find(items, func(i int) string { return items[i].Path })
 	if err != nil {
 		log.Fatal(err)
 	}
 	
+	var ext, target, prog string
 	//TODO: support multi file select
-	var ext string
-	var target string
 	for _, i := range idxs {
-		ext = filepath.Ext(items[i])
-		target = items[i]
+		if items[i].Kind == FILE {
+			ext = filepath.Ext(items[i].Path)
+			target = items[i].Path
+			prog, err = cmdSel(ext)
+		} else {
+			ext = ""
+			target = items[i].Path
+			prog = "cd"
+		}
 	}
 
-	prog, err := cmdSel(ext)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	cmd := exec.Command(prog, target)
+	cmdExec := exec.Command(prog, target)
 
-	output, err := cmd.Output()
+	output, err := cmdExec.Output()
 	if err != nil {
 		log.Fatal(err)
 	}

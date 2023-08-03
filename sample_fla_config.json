@@ -1,0 +1,9 @@
+{
+  "command": {
+    "powerpoint": "ppt",
+    "excel": "xls",
+    "text": "nvi",
+    "markdown": "nvi",
+    "dir": "dir"
+  }
+}
