@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -52,34 +53,30 @@ func cmdSel(ext string, cmd Command) (string, error) {
 	return prog, nil
 }
 
-func main() {
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Println("ERROR: cannot get Home Directory path.", err)
-	}
-
-	configFilePath := homeDir + "/.fzl_config.json"
-
-	jsonData, err := ioutil.ReadFile(configFilePath)
-	if err != nil {
-		fmt.Println("not existence `config.json` file, default values are applied.")
-	}
-
-	var cfg Config
-	err = json.Unmarshal(jsonData, &cfg)
-	if err != nil {
-		fmt.Println("ERROR: cannot json parse")
-		log.Fatal(err)
+func getItems(isOldFile bool) ([]Target, error) {
+	var dirPath string
+	if isOldFile {
+		// search oldfile
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatal(err)
+		}
+		dirPath = filepath.Join(homeDir, "Recent")
+	} else {
+		// seach from path
+		if len(os.Args) == 1 {
+			// if not specify path, current directory.
+			dirPath = "./"
+		} else {
+			// if specified path, the path store in `dirPath` variable
+			dirPath = os.Args[1]
+		}
 	}
 
 	var items []Target
-
-	//TODO: support specific path
-	dirPath := "./"
-
-	err = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil { return err
+	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil { 
+			return err
 		}
 
 		if info.IsDir() && info.Name() == ".git" {
@@ -101,6 +98,43 @@ func main() {
 		return nil
 	})
 
+	if err != nil {
+		return items, err
+	}
+	
+	return items, nil
+}
+
+func main() {
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println("ERROR: cannot get Home Directory path.", err)
+	}
+
+	configFilePath := homeDir + "/.fzl_config.json"
+
+	jsonData, err := ioutil.ReadFile(configFilePath)
+	if err != nil {
+		fmt.Println("Not found `~/.fzl_config.json` config file.")
+	}
+
+	var cfg Config
+	err = json.Unmarshal(jsonData, &cfg)
+	if err != nil {
+		fmt.Println("ERROR: cannot json parse")
+		log.Fatal(err)
+	}
+
+
+	// parse: command line argument
+	oldFileFlag := flag.Bool("oldfile", false, "oldfiles flag")
+	shortOldFileFlag := flag.Bool("o", false, "oldfiles(short) flag")
+	flag.Parse()
+	isOldFile := *oldFileFlag || *shortOldFileFlag
+
+	items, err := getItems(isOldFile)
+	
 	if err != nil {
 		log.Fatal(err)
 	}
