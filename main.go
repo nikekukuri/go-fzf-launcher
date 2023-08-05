@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/koki-develop/go-fzf"
 )
@@ -53,15 +55,52 @@ func cmdSel(ext string, cmd Command) (string, error) {
 	return prog, nil
 }
 
+func getOldItems() ([]Target, error) {
+	cmd := exec.Command("powershell", "Get-ChildItem", "$env:APPDATA\\Microsoft\\Windows\\Recent\\*", "-Name")
+	
+	var items []Target
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println("ERROR: get oldfile list command execution: ", err)
+		return items, err
+	}
+
+	output := stdout.String()
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		fileInfo, err := os.Stat(line)
+		if err != nil {
+			continue
+		}
+
+		if fileInfo.IsDir() {
+			items = append(items, Target{
+				Path: line,
+				Kind: DIR,
+			})
+		} else {
+			items = append(items, Target{
+				Path: line,
+				Kind: FILE,
+			})
+		}
+	}
+
+	return items, nil
+}
+
 func getItems(isOldFile bool) ([]Target, error) {
 	var dirPath string
 	if isOldFile {
 		// search oldfile
-		homeDir, err := os.UserHomeDir()
+		items, err := getOldItems()
 		if err != nil {
 			log.Fatal(err)
 		}
-		dirPath = filepath.Join(homeDir, "Recent")
+		return items, nil
 	} else {
 		// seach from path
 		if len(os.Args) == 1 {
@@ -127,7 +166,7 @@ func main() {
 	}
 
 
-	// parse: command line argument
+	// parse command line argument
 	oldFileFlag := flag.Bool("oldfile", false, "oldfiles flag")
 	shortOldFileFlag := flag.Bool("o", false, "oldfiles(short) flag")
 	flag.Parse()
@@ -167,9 +206,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	cmdExec := exec.Command(prog, target)
+	cmd := exec.Command(prog, target)
 
-	output, err := cmdExec.Output()
+	output, err := cmd.Output()
 	if err != nil {
 		log.Fatal(err)
 	}
