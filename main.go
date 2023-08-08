@@ -47,7 +47,7 @@ func cmdSel(ext string, cmd Command) (string, error) {
 		prog = cmd.Markdown
 	case ".ppt", ".pptx":
 		prog = cmd.PowerPoint
-	case ".xls", "xlsx", "xlsm":
+	case ".xls", ".xlsx", ".xlsm":
 		prog = cmd.Excel
 	default:
 		return "", errors.New("this file extension is undefined")
